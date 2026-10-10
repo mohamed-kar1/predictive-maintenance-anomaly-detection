@@ -1,8 +1,6 @@
-"""Étape 1 : charger le fichier AI4I 2020 dans DuckDB avec dlt.
+"""Étape 1 : charger le fichier AI4I 2020 dans DuckDB avec dlt. """
 
-Lancer depuis la racine du projet :
-    python src/ingestion.py
-"""
+
 from pathlib import Path
 
 import dlt
