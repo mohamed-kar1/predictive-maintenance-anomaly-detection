@@ -1,0 +1,6 @@
+ai4i:
+  target: dev
+  outputs:
+    dev:
+      type: duckdb
+      path: ../ai4i.duckdb

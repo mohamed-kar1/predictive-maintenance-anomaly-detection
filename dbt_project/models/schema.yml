@@ -1,0 +1,36 @@
+version: 2
+
+models:
+  - name: stg_sensor_readings
+    columns:
+      - name: udi
+        data_tests: [unique, not_null]
+      - name: quality_level
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['L', 'M', 'H']
+      - name: machine_failure
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [0, 1]
+      - name: air_temperature_k
+        data_tests: [not_null]
+      - name: process_temperature_k
+        data_tests: [not_null]
+      - name: rotational_speed_rpm
+        data_tests: [not_null]
+      - name: torque_nm
+        data_tests: [not_null]
+      - name: tool_wear_min
+        data_tests: [not_null]
+
+  - name: fct_machine_features
+    columns:
+      - name: udi
+        data_tests: [unique, not_null]
+      - name: temp_diff_k
+        data_tests: [not_null]
+      - name: power_w
+        data_tests: [not_null]

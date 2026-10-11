@@ -1,0 +1,8 @@
+version: 2
+
+sources:
+  - name: raw
+    schema: raw
+    tables:
+      - name: sensor_readings
+        description: "Données AI4I 2020 chargées par dlt (couche brute)."
