@@ -1,6 +1,5 @@
 """Étape 1 : charger le fichier AI4I 2020 dans DuckDB avec dlt. """
 
-
 from pathlib import Path
 
 import dlt
