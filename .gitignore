@@ -4,4 +4,4 @@ data/
 __pycache__/
 .env
 .dlt/secrets.toml
-.tmp_dagster_home_fdbl5wfe/
+.tmp_dagster_home_*/
