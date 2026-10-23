@@ -5,3 +5,7 @@ __pycache__/
 .env
 .dlt/secrets.toml
 .tmp_dagster_home_*/
+
+mlflow.db
+mlruns/
+mlartifacts/

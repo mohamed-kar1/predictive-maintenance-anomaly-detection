@@ -34,3 +34,5 @@ models:
         data_tests: [not_null]
       - name: power_w
         data_tests: [not_null]
+      - name: overstrain_ratio
+        data_tests: [not_null]

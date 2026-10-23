@@ -24,7 +24,7 @@ SORTIE = Path("reports/model_comparison.csv")
 FEATURES = [
     "quality_level_ord", "air_temperature_k", "process_temperature_k",
     "rotational_speed_rpm", "torque_nm", "tool_wear_min",
-    "temp_diff_k", "power_w", "wear_x_torque",
+    "temp_diff_k", "power_w", "wear_x_torque", "overstrain_ratio",
 ]
 # Elliptic Envelope exige une covariance inversible : on retire temp_diff_k,
 # qui vaut exactement « température du process − température de l'air ».
