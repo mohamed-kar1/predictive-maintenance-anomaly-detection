@@ -22,6 +22,9 @@ from fastapi.responses import HTMLResponse
 from mlflow import MlflowClient
 from pydantic import BaseModel, Field, field_validator
 
+from datetime import datetime
+
+import journal
 from features import FEATURES, MESURES, calculer_variables
 
 log = logging.getLogger("api")
@@ -117,6 +120,23 @@ def decision(score: float) -> dict:
             "score": round(float(score), 4), "niveau_alerte": niveau}
 
 
+def journaliser(mesures: pd.DataFrame, scores, source: str, fichier=None, identifiants=None):
+    """Ajoute les prédictions au journal. Une panne du journal ne doit jamais bloquer une prédiction."""
+    try:
+        decisions = [decision(s) for s in scores]
+        lot = mesures[MESURES].copy()
+        lot["quality_level"] = lot["quality_level"].astype(str).str.strip().str.upper()
+        lot["score"] = [d["score"] for d in decisions]
+        lot["resultat"] = [d["resultat"] for d in decisions]
+        lot["niveau_alerte"] = [d["niveau_alerte"] for d in decisions]
+        lot["horodatage"] = datetime.now().replace(microsecond=0)
+        lot["source"], lot["fichier"], lot["identifiant"] = source, fichier, identifiants
+        lot["modele_version"], lot["seuil"] = ETAT["version"], ETAT["seuil"]
+        journal.enregistrer(lot)
+    except Exception as e:
+        log.warning("Journal indisponible : %s", e)
+
+
 def scorer(mesures: pd.DataFrame):
     X = calculer_variables(mesures).values   # tableau nu : comme à l'entraînement
     return ETAT["modele"].predict_proba(X)[:, 1]
@@ -131,8 +151,10 @@ def health():
 @app.post("/predict", response_model=Prediction)
 def predict(machine: Machine):
     """Une machine : renvoie normal ou anormal, le score et le niveau d'alerte."""
-    score = scorer(pd.DataFrame([machine.model_dump()]))[0]
-    return {**decision(score), "seuil": ETAT["seuil"]}
+    mesures = pd.DataFrame([machine.model_dump()])
+    scores = scorer(mesures)
+    journaliser(mesures, scores, "formulaire")
+    return {**decision(scores[0]), "seuil": ETAT["seuil"]}
 
 
 def lire_csv(contenu: bytes) -> pd.DataFrame:
@@ -175,6 +197,7 @@ async def predict_csv(fichier: UploadFile = File(..., description="CSV : une mac
     df = lire_csv(await fichier.read())
     scores = scorer(df)
     id_col = next((c for c in ("udi", "product_id", "id") if c in df.columns), None)
+    journaliser(df, scores, "csv", fichier.filename, df[id_col].astype(str).tolist() if id_col else None)
     resultats = []
     for pos, score in enumerate(scores):
         r = {"ligne": pos + 1, **decision(score)}
@@ -185,6 +208,15 @@ async def predict_csv(fichier: UploadFile = File(..., description="CSV : une mac
             "n_anormales": sum(r["resultat"] == "anormal" for r in resultats),
             "n_alerte_elevee": sum(r["niveau_alerte"] == "élevée" for r in resultats),
             "seuil": ETAT["seuil"], "resultats": resultats}
+
+
+@app.get("/historique")
+def historique(n: int = 10):
+    """Résumé du journal et dernières prédictions enregistrées."""
+    try:
+        return {"resume": journal.resume(), "dernieres": journal.derniers(max(1, min(n, 200)))}
+    except Exception as e:
+        raise HTTPException(503, f"Journal indisponible : {e}")
 
 
 @app.get("/", response_class=HTMLResponse, include_in_schema=False)
