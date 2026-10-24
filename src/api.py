@@ -18,6 +18,7 @@ import mlflow
 import mlflow.sklearn
 import pandas as pd
 from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi.responses import HTMLResponse
 from mlflow import MlflowClient
 from pydantic import BaseModel, Field, field_validator
 
@@ -184,6 +185,12 @@ async def predict_csv(fichier: UploadFile = File(..., description="CSV : une mac
             "n_anormales": sum(r["resultat"] == "anormal" for r in resultats),
             "n_alerte_elevee": sum(r["niveau_alerte"] == "élevée" for r in resultats),
             "seuil": ETAT["seuil"], "resultats": resultats}
+
+
+@app.get("/", response_class=HTMLResponse, include_in_schema=False)
+def accueil():
+    """Interface du technicien (src/interface.html)."""
+    return (Path(__file__).resolve().parent / "interface.html").read_text(encoding="utf-8")
 
 
 if __name__ == "__main__":
