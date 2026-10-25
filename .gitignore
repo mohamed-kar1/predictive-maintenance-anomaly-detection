@@ -9,3 +9,9 @@ __pycache__/
 mlflow.db
 mlruns/
 mlartifacts/
+
+journal.duckdb
+src/interface.html.bak
+.tmp_dagster_home_*
+
+.pytest_cache/
