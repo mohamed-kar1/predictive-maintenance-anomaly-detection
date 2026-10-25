@@ -24,7 +24,6 @@ Le projet couvre toute la chaîne d'un projet data de bout en bout : donnée bru
 10. [Structure du dépôt](#10-structure-du-dépôt)
 11. [Choix de conception](#11-choix-de-conception)
 12. [Limites connues](#12-limites-connues)
-13. [Dépannage](#13-dépannage)
 
 ---
 
