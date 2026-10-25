@@ -399,6 +399,16 @@ async function appeler(bouton, url, options, afficher) {
   bouton.disabled = false;
 }
 
+
+const LIBELLE = {
+  proba_lr: "Score de la régression logistique", quality_level_ord: "Qualité (0 L, 1 M, 2 H)",
+  air_temperature_k: "Température de l’air (K)", process_temperature_k: "Température du process (K)",
+  rotational_speed_rpm: "Vitesse de rotation (tr/min)", torque_nm: "Couple (Nm)", tool_wear_min: "Usure de l’outil (min)",
+  temp_diff_k: "Écart de température (K)", power_w: "Puissance (W)", wear_x_torque: "Usure × couple",
+  overstrain_ratio: "Rapport de surcharge"
+};
+const libelle = (v) => LIBELLE[v] ?? v;
+
 function point(v, r) { const a = Math.PI * (1 - v); return [(110 + r * Math.cos(a)).toFixed(1), (110 - r * Math.sin(a)).toFixed(1)]; }
 function arc(v1, v2, couleur) {
   const [x1, y1] = point(v1, 90), [x2, y2] = point(v2, 90);
@@ -430,17 +440,18 @@ $("#go-csv").onclick = () => {
   if (!f) return erreur("Choisissez d’abord un fichier CSV.");
   const donnees = new FormData(); donnees.append("fichier", f);
   appeler($("#go-csv"), "/predict_csv", {method: "POST", body: donnees}, (j) => {
+    const avecFacteur = j.resultats.some((r) => r.facteur_principal);
     const lignes = j.resultats.slice().sort((a, b) => b.score - a.score).map((r) => {
       const n = NIVEAU[r.niveau_alerte];
       return `<tr><td>${esc(r.identifiant ?? "ligne " + r.ligne)}</td><td>${r.resultat}</td>
         <td class="${n}" style="background:none">${fmt(r.score)}<span class="bar"><i style="width:${Math.round(r.score * 100)}%"></i></span></td>
-        <td><span class="pill ${n}">${r.niveau_alerte}</span></td></tr>`;
+        <td><span class="pill ${n}">${r.niveau_alerte}</span></td>${avecFacteur ? `<td>${r.facteur_principal ? esc(libelle(r.facteur_principal)) : "—"}</td>` : ""}</tr>`;
     }).join("");
     const taux = j.n_machines ? Math.round(100 * j.n_anormales / j.n_machines) : 0;
     $("#sortie").innerHTML = `<div class="body"><div class="kpi">
       <div><b>${j.n_machines}</b>machines analysées</div><div><b>${j.n_anormales}</b>anormales</div>
       <div><b>${j.n_alerte_elevee}</b>alertes élevées</div><div><b>${taux} %</b>de machines anormales</div></div>
-      <div class="scroll"><table><thead><tr><th>Machine</th><th>Résultat</th><th>Score</th><th>Alerte</th></tr></thead><tbody>${lignes}</tbody></table></div>
+      <div class="scroll"><table><thead><tr><th>Machine</th><th>Résultat</th><th>Score</th><th>Alerte</th>${avecFacteur ? "<th>Facteur principal</th>" : ""}</tr></thead><tbody>${lignes}</tbody></table></div>
       <p class="hint">Trié du plus au moins urgent.</p></div>`;
   });
 };
