@@ -1,0 +1,11 @@
+variable,shap_abs_moyen,part
+torque_nm,7.0922,0.4003
+power_w,3.8185,0.2155
+tool_wear_min,2.3346,0.1318
+rotational_speed_rpm,1.9475,0.1099
+wear_x_torque,1.3035,0.0736
+temp_diff_k,0.6161,0.0348
+air_temperature_k,0.2284,0.0129
+quality_level_ord,0.2062,0.0116
+process_temperature_k,0.0942,0.0053
+overstrain_ratio,0.076,0.0043

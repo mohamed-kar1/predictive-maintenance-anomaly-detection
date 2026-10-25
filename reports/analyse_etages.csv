@@ -1,0 +1,3 @@
+etage,seuil,vrais_negatifs,faux_positifs,faux_negatifs,vrais_positifs,pannes_detectees_%,fausses_alertes_sur_normales_%,alertes_justifiees_%,f1,accuracy,precision_macro,f1_macro
+1 : LR (proba_lr),0.5,8269,1374,49,281,85.2,14.25,17.0,0.2831,0.8573,0.5819,0.6019
+2 : XGBoost (score final),0.5748,9621,22,70,260,78.8,0.23,92.2,0.8497,0.9908,0.9574,0.9225
