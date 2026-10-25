@@ -73,7 +73,7 @@ def model_comparison() -> MaterializeResult:
     return MaterializeResult(metadata={
         "meilleur_detecteur": str(df.iloc[0]["modele"]),
         "pr_auc_meilleur": float(df.iloc[0]["pr_auc_moy"]),
-        "classement": MetadataValue.md(tableau_md(df, ["modele", "pr_auc_moy", "pr_auc_ecart", "f1_moy"]))})
+        "classement": MetadataValue.md(tableau_md(df, ["modele", "pr_auc_moy", "pr_auc_ecart", "f1_moy", "f1_macro_moy", "accuracy_moy"]))})
 
 
 @asset(deps=[model_comparison], group_name="suivi_mlflow",
@@ -88,11 +88,12 @@ def stacking_comparison() -> MaterializeResult:
     lancer("train_stacking.py")
     df = pd.read_csv(ROOT / "reports" / "stacking_comparison.csv").sort_values("pr_auc_moy", ascending=False)
     return MaterializeResult(metadata={
-        "classement": MetadataValue.md(tableau_md(df, ["variante", "pr_auc_moy", "pr_auc_ecart", "f1_moy"]))})
+        "classement": MetadataValue.md(tableau_md(df, ["variante", "pr_auc_moy", "pr_auc_ecart", "f1_moy", "f1_macro_moy", "accuracy_moy"]))})
 
 
 @asset(deps=[stacking_comparison], group_name="suivi_mlflow",
-       description="Entraîne le modèle final retenu (LR -> XGBoost, 10 variables) et l'enregistre dans le registre MLflow. "
+       description="Entraîne le modèle final retenu (LR -> XGBoost, 10 variables), calcule l'importance SHAP des variables "
+                   "et enregistre le modèle dans le registre MLflow. "
                    "L'alias « champion » utilisé par l'API n'est pas déplacé : à faire dans MLflow après vérification.")
 def final_model() -> MaterializeResult:
     lancer("train_final_stacking.py")
@@ -113,9 +114,13 @@ def final_model() -> MaterializeResult:
             meta["pr_auc_modele_compose"] = float(ligne.iloc[0]["pr_auc_moy"])
     if "seuil_anomalie" in run.data.params:
         meta["seuil_anomalie"] = float(run.data.params["seuil_anomalie"])
-    for m in ("pr_auc_cv", "precision_cv", "rappel_cv", "f1_cv"):
+    for m in ("pr_auc_cv", "precision_cv", "rappel_cv", "f1_cv", "accuracy_cv", "precision_macro_cv", "f1_macro_cv"):
         if m in run.data.metrics:
             meta[m] = float(run.data.metrics[m])
+    shap_csv = ROOT / "reports" / "shap_importance.csv"
+    if shap_csv.exists():
+        imp = pd.read_csv(shap_csv)
+        meta["importance_shap"] = MetadataValue.md(tableau_md(imp.head(5), ["variable", "shap_abs_moyen", "part"]))
     return MaterializeResult(metadata=meta)
 
 

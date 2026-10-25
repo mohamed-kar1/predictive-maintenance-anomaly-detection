@@ -1,3 +1,3 @@
-variante,mode,n_variables,pr_auc_moy,precision_moy,rappel_moy,f1_moy,pr_auc_ecart,precision_ecart,rappel_ecart,f1_ecart
-LR -> XGBoost : 10 variables + sortie LR,lr_et_variables,10,0.8939,0.8303,0.8303,0.8303,0.0348,0.0496,0.0496,0.0496
-LR -> XGBoost : sortie LR seule,lr_seule,10,0.4125,0.4433,0.4727,0.4574,0.1056,0.0691,0.0646,0.0664
+variante,mode,n_variables,pr_auc_moy,precision_moy,rappel_moy,f1_moy,accuracy_moy,precision_macro_moy,f1_macro_moy,pr_auc_ecart,precision_ecart,rappel_ecart,f1_ecart,accuracy_ecart,precision_macro_ecart,f1_macro_ecart
+LR -> XGBoost : 10 variables + sortie LR,lr_et_variables,10,0.8939,0.8303,0.8303,0.8303,0.9888,0.9122,0.9122,0.0348,0.0496,0.0496,0.0496,0.0033,0.0256,0.0256
+LR -> XGBoost : sortie LR seule,lr_seule,10,0.4125,0.4433,0.4727,0.4574,0.9628,0.7126,0.7191,0.1056,0.0691,0.0646,0.0664,0.005,0.0356,0.0345

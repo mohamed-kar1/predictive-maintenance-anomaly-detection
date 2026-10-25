@@ -11,7 +11,8 @@ import numpy as np
 import pandas as pd
 from sklearn.covariance import EllipticEnvelope
 from sklearn.ensemble import IsolationForest
-from sklearn.metrics import average_precision_score, precision_recall_fscore_support
+from sklearn.metrics import (accuracy_score, average_precision_score, f1_score, precision_score,
+                             recall_score)
 from sklearn.model_selection import StratifiedKFold
 from sklearn.neighbors import LocalOutlierFactor
 from sklearn.preprocessing import StandardScaler
@@ -53,12 +54,29 @@ DETECTEURS = {
 }
 
 
+def metriques_decision(y_vrai, y_pred):
+    """Métriques d'une décision normal / anormal.
+
+    - precision, rappel, f1 : classe « panne » seule (celle qui compte pour la maintenance) ;
+    - precision_macro, f1_macro : moyenne des deux classes, à poids égal (la classe rare pèse autant
+      que la classe normale) ;
+    - accuracy : part de décisions correctes. À lire avec prudence : prédire « jamais de panne »
+      donne déjà environ 96,6 %.
+    """
+    return {
+        "precision": precision_score(y_vrai, y_pred, zero_division=0),
+        "rappel": recall_score(y_vrai, y_pred, zero_division=0),
+        "f1": f1_score(y_vrai, y_pred, zero_division=0),
+        "accuracy": accuracy_score(y_vrai, y_pred),
+        "precision_macro": precision_score(y_vrai, y_pred, average="macro", zero_division=0),
+        "f1_macro": f1_score(y_vrai, y_pred, average="macro", zero_division=0),
+    }
+
+
 def mesurer(y_test, score, taux):
-    """PR-AUC, puis précision / rappel / F1 en signalant la part `taux` de machines les plus suspectes."""
-    pr_auc = average_precision_score(y_test, score)
+    """PR-AUC, puis les métriques de décision en signalant la part `taux` de machines les plus suspectes."""
     signale = (score >= np.quantile(score, 1 - taux)).astype(int)
-    p, r, f1, _ = precision_recall_fscore_support(y_test, signale, average="binary", zero_division=0)
-    return {"pr_auc": pr_auc, "precision": p, "rappel": r, "f1": f1}
+    return {"pr_auc": average_precision_score(y_test, score), **metriques_decision(y_test, signale)}
 
 
 def main():
@@ -88,10 +106,12 @@ def main():
     SORTIE.parent.mkdir(exist_ok=True)
     tableau.round(4).to_csv(SORTIE, index=False)
 
-    print(f"{'Modèle':28s} {'PR-AUC':>13s} {'F1':>13s} {'Précision':>10s} {'Rappel':>8s}")
+    print(f"{'Modèle':28s} {'PR-AUC':>13s} {'F1':>13s} {'Précision':>10s} {'Rappel':>8s} "
+          f"{'F1 macro':>9s} {'Préc. macro':>12s} {'Accuracy':>9s}")
     for _, l in tableau.iterrows():
         print(f"{l['modele']:28s} {l['pr_auc_moy']:.3f} ± {l['pr_auc_ecart']:.3f}  "
-              f"{l['f1_moy']:.3f} ± {l['f1_ecart']:.3f}  {l['precision_moy']:10.3f} {l['rappel_moy']:8.3f}")
+              f"{l['f1_moy']:.3f} ± {l['f1_ecart']:.3f}  {l['precision_moy']:10.3f} {l['rappel_moy']:8.3f} "
+              f"{l['f1_macro_moy']:9.3f} {l['precision_macro_moy']:12.3f} {l['accuracy_moy']:9.3f}")
 
     print(f"\nMeilleur détecteur non supervisé (PR-AUC) : {tableau.iloc[0]['modele']}")
     print(f"Résultats enregistrés dans {SORTIE}")

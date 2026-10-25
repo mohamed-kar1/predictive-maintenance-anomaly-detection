@@ -86,10 +86,11 @@ def main():
             mlflow.log_metrics({c: float(l[c]) for c in tableau.columns if c.endswith(("_moy", "_ecart"))})
             mlflow.log_artifact(str(SORTIE))
 
-    print(f"{'Variante':44s} {'PR-AUC':>13s} {'F1':>13s}")
+    print(f"{'Variante':44s} {'PR-AUC':>13s} {'F1':>13s} {'F1 macro':>9s} {'Préc.':>6s} {'Préc. macro':>12s} {'Accuracy':>9s}")
     for _, l in tableau.iterrows():
         print(f"{l['variante']:44s} {l['pr_auc_moy']:.3f} ± {l['pr_auc_ecart']:.3f}  "
-              f"{l['f1_moy']:.3f} ± {l['f1_ecart']:.3f}")
+              f"{l['f1_moy']:.3f} ± {l['f1_ecart']:.3f}  {l['f1_macro_moy']:9.3f} {l['precision_moy']:6.3f} "
+              f"{l['precision_macro_moy']:12.3f} {l['accuracy_moy']:9.3f}")
     print(f"\nRésultats enregistrés dans {SORTIE} et dans MLflow (expérience ai4i_stacking_final)")
 
 
