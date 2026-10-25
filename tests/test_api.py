@@ -65,6 +65,41 @@ def test_champ_manquant_refuse(client):
     assert client.post("/predict", json=machine).status_code == 422
 
 
+# ------------------------------------------------------------------ explications SHAP
+
+def test_predict_renvoie_une_explication_shap(client_shap):
+    j = client_shap.post("/predict", json=SURCHARGE_FORTE).json()
+    assert {"resultat", "score", "niveau_alerte", "seuil", "explication"} <= set(j)
+    expl = j["explication"]
+    assert len(expl) == 5
+    assert all(set(c) == {"variable", "valeur", "contribution"} for c in expl)
+    poids = [abs(c["contribution"]) for c in expl]
+    assert poids == sorted(poids, reverse=True)
+
+
+def test_la_surcharge_pousse_vers_anormal(client_shap):
+    expl = client_shap.post("/predict", json=SURCHARGE_FORTE).json()["explication"]
+    assert sum(c["contribution"] for c in expl) > 0   # globalement vers « anormal »
+
+
+def test_sans_explainer_pas_d_explication(client):
+    assert "explication" not in client.post("/predict", json=SURCHARGE).json()
+
+
+def test_une_panne_de_shap_ne_bloque_pas_la_prediction(client_shap, monkeypatch):
+    import explain
+    monkeypatch.setattr(explain, "contributions", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("shap")))
+    r = client_shap.post("/predict", json=SURCHARGE_FORTE)
+    assert r.status_code == 200 and "explication" not in r.json() and r.json()["resultat"] == "anormal"
+
+
+def test_csv_facteur_principal_seulement_pour_les_machines_anormales(client_shap):
+    r = client_shap.post("/predict_csv", files=csv("L,298.1,308.6,1551,42.8,0", "L,300,310,1400,60,250")).json()
+    normale, anormale = r["resultats"]
+    assert normale["resultat"] == "normal" and "facteur_principal" not in normale
+    assert anormale["resultat"] == "anormal" and anormale["facteur_principal"]
+
+
 # ------------------------------------------------------------------ /predict_csv
 
 def test_csv_plusieurs_machines(client):

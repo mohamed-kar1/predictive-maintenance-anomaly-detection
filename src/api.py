@@ -4,6 +4,9 @@ Au démarrage, charge le modèle portant l'alias « champion » dans le registre
 son seuil d'anomalie (paramètres de l'essai qui l'a produit). Les variables sont calculées par
 features.py, le même code qu'à l'entraînement.
 
+Chaque prédiction d'une machine est accompagnée d'une explication SHAP : les variables qui ont le
+plus pesé sur le score (voir explain.py). Une panne de l'explication ne bloque jamais la prédiction.
+
 Lancer depuis la racine du projet :
     python src/api.py
 puis ouvrir http://127.0.0.1:8000/docs
@@ -24,6 +27,7 @@ from pydantic import BaseModel, Field, field_validator
 
 from datetime import datetime
 
+import explain
 import journal
 from features import FEATURES, MESURES, calculer_variables
 
@@ -52,7 +56,9 @@ ALIAS_COLONNES = {
     "tool wear [min]": "tool_wear_min",
 }
 
-ETAT = {}   # modèle, version et seuils, remplis au démarrage
+N_EXPLICATION = 5   # nombre de variables renvoyées dans l'explication d'une machine
+
+ETAT = {}   # modèle, explainer SHAP, version et seuils, remplis au démarrage
 
 
 def charger_modele():
@@ -67,7 +73,12 @@ def charger_modele():
             f"Le modèle « {ALIAS} » n'a pas été entraîné sur les variables de features.py.\n"
             f"  modèle     : {params.get('variables')}\n  features.py: {','.join(FEATURES)}")
     modele = mlflow.sklearn.load_model(f"models:/{NOM_MODELE}@{ALIAS}")
-    ETAT.update(modele=modele, version=int(version.version),
+    try:
+        explainer = explain.creer_explainer(modele)
+    except Exception as e:   # l'explication est un plus : sans elle, l'API prédit quand même
+        log.warning("Explications SHAP indisponibles : %s", e)
+        explainer = None
+    ETAT.update(modele=modele, explainer=explainer, version=int(version.version),
                 seuil=float(params["seuil_anomalie"]),
                 seuil_eleve=float(params.get("seuil_alerte_elevee", 0.8)))
     log.warning("Modèle chargé : %s version %s, seuil %.3f", NOM_MODELE, version.version, ETAT["seuil"])
@@ -101,11 +112,19 @@ class Machine(BaseModel):
         return v.strip().upper() if isinstance(v, str) else v
 
 
+class Contribution(BaseModel):
+    variable: str = Field(description="Entrée de XGBoost : une des 10 variables, ou proba_lr (sortie de la régression logistique)")
+    valeur: float = Field(description="Valeur prise par cette entrée pour la machine")
+    contribution: float = Field(description="Contribution SHAP en log-odds : > 0 pousse vers « anormal », < 0 vers « normal »")
+
+
 class Prediction(BaseModel):
     resultat: Literal["normal", "anormal"]
     score: float
     niveau_alerte: Literal["aucune", "modérée", "élevée"]
     seuil: float
+    explication: list[Contribution] | None = Field(
+        default=None, description="Les variables qui pèsent le plus sur le score (SHAP). Absente si indisponible.")
 
 
 def decision(score: float) -> dict:
@@ -142,19 +161,36 @@ def scorer(mesures: pd.DataFrame):
     return ETAT["modele"].predict_proba(X)[:, 1]
 
 
+def expliquer(mesures: pd.DataFrame):
+    """Contributions SHAP de chaque machine : (entrées de XGBoost, contributions), ou None si indisponible."""
+    if ETAT.get("explainer") is None:
+        return None
+    try:
+        X = calculer_variables(mesures).values
+        return explain.contributions(ETAT["explainer"], ETAT["modele"], X)
+    except Exception as e:
+        log.warning("Explication indisponible : %s", e)
+        return None
+
+
 @app.get("/health")
 def health():
     return {"statut": "ok", "modele": NOM_MODELE, "version": ETAT["version"],
             "seuil_anomalie": ETAT["seuil"], "seuil_alerte_elevee": ETAT["seuil_eleve"]}
 
 
-@app.post("/predict", response_model=Prediction)
+@app.post("/predict", response_model=Prediction, response_model_exclude_none=True)
 def predict(machine: Machine):
-    """Une machine : renvoie normal ou anormal, le score et le niveau d'alerte."""
+    """Une machine : renvoie normal ou anormal, le score, le niveau d'alerte et les variables qui pèsent le plus."""
     mesures = pd.DataFrame([machine.model_dump()])
     scores = scorer(mesures)
     journaliser(mesures, scores, "formulaire")
-    return {**decision(scores[0]), "seuil": ETAT["seuil"]}
+    reponse = {**decision(scores[0]), "seuil": ETAT["seuil"]}
+    shap_ = expliquer(mesures)
+    if shap_ is not None:
+        entrees, contrib = shap_
+        reponse["explication"] = explain.top_contributions(entrees[0], contrib[0], N_EXPLICATION)
+    return reponse
 
 
 def lire_csv(contenu: bytes) -> pd.DataFrame:
@@ -191,6 +227,18 @@ def lire_csv(contenu: bytes) -> pd.DataFrame:
     return df
 
 
+def facteurs_principaux(df: pd.DataFrame, scores) -> dict:
+    """Pour chaque machine anormale : la variable qui pousse le plus vers « anormal » (position -> nom)."""
+    positions = [i for i, s in enumerate(scores) if s >= ETAT["seuil"]]
+    if not positions:
+        return {}
+    shap_ = expliquer(df.iloc[positions])
+    if shap_ is None:
+        return {}
+    _, contrib = shap_
+    return {pos: explain.NOMS_ENTREES[int(c.argmax())] for pos, c in zip(positions, contrib)}
+
+
 @app.post("/predict_csv")
 async def predict_csv(fichier: UploadFile = File(..., description="CSV : une machine par ligne")):
     """Plusieurs machines : un résultat par ligne du fichier."""
@@ -198,11 +246,14 @@ async def predict_csv(fichier: UploadFile = File(..., description="CSV : une mac
     scores = scorer(df)
     id_col = next((c for c in ("udi", "product_id", "id") if c in df.columns), None)
     journaliser(df, scores, "csv", fichier.filename, df[id_col].astype(str).tolist() if id_col else None)
+    facteurs = facteurs_principaux(df, scores)
     resultats = []
     for pos, score in enumerate(scores):
         r = {"ligne": pos + 1, **decision(score)}
         if id_col:
             r["identifiant"] = str(df.iloc[pos][id_col])
+        if pos in facteurs:
+            r["facteur_principal"] = facteurs[pos]
         resultats.append(r)
     return {"n_machines": len(resultats),
             "n_anormales": sum(r["resultat"] == "anormal" for r in resultats),
