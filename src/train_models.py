@@ -1,4 +1,5 @@
-"""Étape 4 : entraîner et comparer six modèles sur la table de variables (marts).
+"""Étape 4 : entraîner et comparer quatre détecteurs d'anomalies sur la table de variables (marts).
+Le modèle composé LR -> XGBoost est évalué à part (train_stacking.py).
 
 Lancer depuis la racine du projet :
     python src/train_models.py
@@ -15,8 +16,6 @@ from sklearn.model_selection import StratifiedKFold
 from sklearn.neighbors import LocalOutlierFactor
 from sklearn.preprocessing import StandardScaler
 from sklearn.svm import OneClassSVM
-from imblearn.over_sampling import SMOTE
-from xgboost import XGBClassifier
 
 DB_PATH = "ai4i.duckdb"
 SORTIE = Path("reports/model_comparison.csv")
@@ -52,8 +51,6 @@ DETECTEURS = {
     "Local Outlier Factor": lambda: LocalOutlierFactor(n_neighbors=35, novelty=True),
     "Elliptic Envelope": lambda: EllipticEnvelope(contamination=0.01, random_state=SEED),
 }
-XGB = "XGBoost (supervisé)"
-XGB_SMOTE = "XGBoost + SMOTE (supervisé)"
 
 
 def mesurer(y_test, score, taux):
@@ -69,7 +66,7 @@ def main():
     X, y = df[FEATURES].values, df[TARGET].values
     print(f"{len(df)} machines, {int(y.sum())} pannes ({y.mean():.1%}), {len(FEATURES)} variables\n")
 
-    resultats = {nom: [] for nom in [*DETECTEURS, XGB, XGB_SMOTE]}
+    resultats = {nom: [] for nom in list(DETECTEURS)}
     for tr, te in StratifiedKFold(N_PLIS, shuffle=True, random_state=SEED).split(X, y):
         taux = y[tr].mean()
 
@@ -81,22 +78,10 @@ def main():
             modele = creer().fit(X_normales[:, cols])
             resultats[nom].append(mesurer(y[te], -modele.decision_function(X_test[:, cols]), taux))
 
-        xgb = XGBClassifier(n_estimators=300, max_depth=4, learning_rate=0.1,
-                            eval_metric="logloss", random_state=SEED).fit(X[tr], y[tr])
-        resultats[XGB].append(mesurer(y[te], xgb.predict_proba(X[te])[:, 1], taux))
-
-        # SMOTE : uniquement sur le jeu d'entraînement du pli (le pli de test reste intact).
-        # Variables standardisées avant SMOTE, car il calcule des distances entre voisins.
-        sc = StandardScaler().fit(X[tr])
-        X_sm, y_sm = SMOTE(random_state=SEED).fit_resample(sc.transform(X[tr]), y[tr])
-        xgb_sm = XGBClassifier(n_estimators=300, max_depth=4, learning_rate=0.1,
-                               eval_metric="logloss", random_state=SEED).fit(X_sm, y_sm)
-        resultats[XGB_SMOTE].append(mesurer(y[te], xgb_sm.predict_proba(sc.transform(X[te]))[:, 1], taux))
-
     lignes = []
     for nom, plis in resultats.items():
         t = pd.DataFrame(plis)
-        lignes.append({"modele": nom, "supervise": nom in (XGB, XGB_SMOTE),
+        lignes.append({"modele": nom, "supervise": False,
                        **{f"{m}_moy": t[m].mean() for m in t}, **{f"{m}_ecart": t[m].std() for m in t}})
     tableau = pd.DataFrame(lignes).sort_values("pr_auc_moy", ascending=False)
 
@@ -108,10 +93,7 @@ def main():
         print(f"{l['modele']:28s} {l['pr_auc_moy']:.3f} ± {l['pr_auc_ecart']:.3f}  "
               f"{l['f1_moy']:.3f} ± {l['f1_ecart']:.3f}  {l['precision_moy']:10.3f} {l['rappel_moy']:8.3f}")
 
-    meilleur = tableau.iloc[0]["modele"]
-    meilleur_non_sup = tableau[~tableau["supervise"]].iloc[0]["modele"]
-    print(f"\nMeilleur modèle (PR-AUC) : {meilleur}")
-    print(f"Meilleur détecteur non supervisé : {meilleur_non_sup}")
+    print(f"\nMeilleur détecteur non supervisé (PR-AUC) : {tableau.iloc[0]['modele']}")
     print(f"Résultats enregistrés dans {SORTIE}")
 
 

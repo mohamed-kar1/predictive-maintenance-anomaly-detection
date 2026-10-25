@@ -1,4 +1,3 @@
 variante,mode,n_variables,pr_auc_moy,precision_moy,rappel_moy,f1_moy,pr_auc_ecart,precision_ecart,rappel_ecart,f1_ecart
-Référence : XGBoost seul,seul,10,0.9023,0.8303,0.8303,0.8303,0.0317,0.0496,0.0496,0.0496
 LR -> XGBoost : 10 variables + sortie LR,lr_et_variables,10,0.8939,0.8303,0.8303,0.8303,0.0348,0.0496,0.0496,0.0496
 LR -> XGBoost : sortie LR seule,lr_seule,10,0.4125,0.4433,0.4727,0.4574,0.1056,0.0691,0.0646,0.0664

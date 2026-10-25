@@ -1,7 +1,7 @@
 """Modèle composé LR -> XGBoost avec les 10 variables (dont overstrain_ratio), deux façons :
   1) XGBoost reçoit uniquement la probabilité donnée par la LR ;
   2) XGBoost reçoit les 10 variables + la probabilité donnée par la LR.
-XGBoost seul sert de référence. Mêmes plis et mêmes métriques que train_models.py.
+Mêmes plis et mêmes métriques que train_models.py.
 
 Anti-fuite : sur le train du pli, la probabilité de la LR vient de prédictions hors-échantillon
 (validation croisée interne) ; sur le test, la LR est entraînée sur tout le train du pli.
@@ -28,9 +28,8 @@ assert len(FEATURES_10) == 10, f"10 variables attendues, obtenu {len(FEATURES_10
 SORTIE = Path("reports/stacking_comparison.csv")
 TRACKING_URI = "sqlite:///mlflow.db"
 
-# nom : mode   ("seul" | "lr_seule" | "lr_et_variables")
+# nom : mode   ("lr_seule" | "lr_et_variables")
 VARIANTES = {
-    "Référence : XGBoost seul": "seul",
     "LR -> XGBoost : sortie LR seule": "lr_seule",
     "LR -> XGBoost : 10 variables + sortie LR": "lr_et_variables",
 }
@@ -61,9 +60,7 @@ def main():
         p_te = creer_lr().fit(X[tr], y[tr]).predict_proba(X[te])[:, 1]
 
         for nom, mode in VARIANTES.items():
-            if mode == "seul":
-                X_tr, X_te = X[tr], X[te]
-            elif mode == "lr_seule":
+            if mode == "lr_seule":
                 X_tr, X_te = p_tr.reshape(-1, 1), p_te.reshape(-1, 1)
             else:
                 X_tr, X_te = np.column_stack([X[tr], p_tr]), np.column_stack([X[te], p_te])

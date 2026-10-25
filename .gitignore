@@ -15,3 +15,32 @@ src/interface.html.bak
 .tmp_dagster_home_*
 
 .pytest_cache/
+
+# Environnement Python
+venv/
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+
+# Secrets et configuration locale
+.env
+.env.*
+!.env.example
+
+# MLflow local
+mlflow.db
+mlflow.db-shm
+mlflow.db-wal
+mlflow_backup_*.db
+mlruns/
+
+# Scripts temporaires de nettoyage
+inspecter_mlflow.py
+nettoyer_mlflow.py
+
+# Logs et fichiers temporaires
+*.log
+.DS_Store
+Thumbs.db

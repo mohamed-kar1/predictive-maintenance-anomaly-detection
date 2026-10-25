@@ -66,24 +66,24 @@ def ai4i_dbt(context: AssetExecutionContext, dbt: DbtCliResource):
 # Chaîne volontairement linéaire : une seule étape écrit dans mlflow.db à la fois.
 
 @asset(deps=[FEATURES_DBT], group_name="modelisation",
-       description="Compare 6 modèles en validation croisée à 5 plis (train_models.py).")
+       description="Compare 4 détecteurs d'anomalies en validation croisée à 5 plis (train_models.py).")
 def model_comparison() -> MaterializeResult:
     lancer("train_models.py")
     df = pd.read_csv(ROOT / "reports" / "model_comparison.csv").sort_values("pr_auc_moy", ascending=False)
     return MaterializeResult(metadata={
-        "meilleur_des_6_modeles": str(df.iloc[0]["modele"]),
+        "meilleur_detecteur": str(df.iloc[0]["modele"]),
         "pr_auc_meilleur": float(df.iloc[0]["pr_auc_moy"]),
         "classement": MetadataValue.md(tableau_md(df, ["modele", "pr_auc_moy", "pr_auc_ecart", "f1_moy"]))})
 
 
 @asset(deps=[model_comparison], group_name="suivi_mlflow",
-       description="Enregistre les 6 essais de la comparaison dans MLflow (log_comparison.py).")
+       description="Enregistre les 4 essais de la comparaison dans MLflow (log_comparison.py).")
 def mlflow_runs():
     lancer("log_comparison.py")
 
 
 @asset(deps=[mlflow_runs], group_name="modelisation",
-       description="Compare XGBoost seul et le modèle composé LR -> XGBoost (train_stacking.py).")
+       description="Évalue les variantes du modèle composé LR -> XGBoost (train_stacking.py).")
 def stacking_comparison() -> MaterializeResult:
     lancer("train_stacking.py")
     df = pd.read_csv(ROOT / "reports" / "stacking_comparison.csv").sort_values("pr_auc_moy", ascending=False)
@@ -106,13 +106,11 @@ def final_model() -> MaterializeResult:
         champion = None
     meta = {"modele_retenu": "LR -> XGBoost (modèle composé, 10 variables)",
             "nouvelle_version": int(derniere.version), "version_champion_utilisee_par_l_api": champion}
-    # Les chiffres qui justifient le choix : le modèle composé égale XGBoost seul.
     comp = pd.read_csv(ROOT / "reports" / "stacking_comparison.csv")
     if "mode" in comp.columns:
-        for mode, cle in (("seul", "pr_auc_xgboost_seul"), ("lr_et_variables", "pr_auc_modele_compose")):
-            ligne = comp[comp["mode"] == mode]
-            if not ligne.empty:
-                meta[cle] = float(ligne.iloc[0]["pr_auc_moy"])
+        ligne = comp[comp["mode"] == "lr_et_variables"]
+        if not ligne.empty:
+            meta["pr_auc_modele_compose"] = float(ligne.iloc[0]["pr_auc_moy"])
     if "seuil_anomalie" in run.data.params:
         meta["seuil_anomalie"] = float(run.data.params["seuil_anomalie"])
     for m in ("pr_auc_cv", "precision_cv", "rappel_cv", "f1_cv"):

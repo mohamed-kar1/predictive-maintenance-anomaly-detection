@@ -1,6 +1,4 @@
 modele,supervise,pr_auc_moy,precision_moy,rappel_moy,f1_moy,pr_auc_ecart,precision_ecart,rappel_ecart,f1_ecart
-XGBoost + SMOTE (supervisé),True,0.9113,0.8303,0.8303,0.8303,0.0312,0.0484,0.0484,0.0484
-XGBoost (supervisé),True,0.9005,0.8333,0.8333,0.8333,0.0309,0.0442,0.0442,0.0442
 Local Outlier Factor,False,0.4495,0.4394,0.4394,0.4394,0.0963,0.0857,0.0857,0.0857
 One-Class SVM,False,0.4328,0.4364,0.4364,0.4364,0.1137,0.1024,0.1024,0.1024
 Isolation Forest,False,0.2755,0.3273,0.3273,0.3273,0.0843,0.0874,0.0874,0.0874

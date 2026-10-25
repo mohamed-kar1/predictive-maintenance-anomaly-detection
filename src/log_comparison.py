@@ -17,8 +17,6 @@ PARAMS = {
     "One-Class SVM": {"nu": 0.05, "gamma": "scale"},
     "Local Outlier Factor": {"n_neighbors": 35},
     "Elliptic Envelope": {"contamination": 0.01},
-    "XGBoost (supervisé)": {"n_estimators": 300, "max_depth": 4, "learning_rate": 0.1},
-    "XGBoost + SMOTE (supervisé)": {"n_estimators": 300, "max_depth": 4, "learning_rate": 0.1, "smote": True},
 }
 
 
