@@ -1,0 +1,50 @@
+# Tout relancer en une commande :   docker compose up --build
+#   -> API + interface : http://localhost:8000   (documentation : /docs)
+# Outils optionnels (MLflow, Dagster) :   docker compose --profile tools up --build
+
+x-app: &app
+  build: .
+  image: ai4i-maintenance:latest
+  volumes:
+    - state:/app/state          # bases DuckDB, registre MLflow, journal des prédictions
+    - ./data:/app/data          # ai4i2020.csv (téléchargé s'il est absent)
+
+services:
+  api:
+    <<: *app
+    environment:
+      RUN_BOOTSTRAP: "1"        # ingestion -> dbt -> entraînement, au premier démarrage seulement
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 300s        # laisse le temps à la première préparation
+    restart: unless-stopped
+
+  mlflow:
+    <<: *app
+    profiles: ["tools"]
+    command: ["mlflow", "ui", "--backend-store-uri", "sqlite:///mlflow.db", "--host", "0.0.0.0", "--port", "5000"]
+    ports:
+      - "5000:5000"
+    depends_on:
+      api:
+        condition: service_healthy
+
+  dagster:
+    <<: *app
+    profiles: ["tools"]
+    environment:
+      DAGSTER_HOME: /tmp/dagster_home
+    command: ["dagster", "dev", "-f", "orchestration/definitions.py", "-h", "0.0.0.0", "-p", "3000"]
+    ports:
+      - "3000:3000"
+    depends_on:
+      api:
+        condition: service_healthy
+
+volumes:
+  state:
